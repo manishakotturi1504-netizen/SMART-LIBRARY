@@ -1,0 +1,545 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Smart Library Management System</title>
+
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
+<style>
+:root {
+  --navy: #203653;
+  --blue: #4169a8;
+  --bg: #f3f6fb;
+  --green: #dff5e9;
+}
+body {
+  background: var(--bg);
+  font-family: Arial, sans-serif;
+  color: #253247;
+}
+.navbar { background: white; }
+.brand { color: var(--navy); font-weight: 800; }
+.hero {
+  background: linear-gradient(120deg,#203653,#4169a8);
+  color: white; border-radius: 22px;
+  padding: 35px; overflow: hidden;
+}
+.card {
+  border: 0; border-radius: 17px;
+  box-shadow: 0 5px 22px #243b530b;
+}
+.btn-primary { background: var(--blue); border-color: var(--blue); }
+.form-control,.form-select { padding: 10px; border-radius: 9px; }
+.view { display:none; animation: appear .3s ease; }
+.view.active { display:block; }
+@keyframes appear {
+  from {opacity:0; transform:translateY(7px)}
+  to {opacity:1; transform:translateY(0)}
+}
+.book-icon { font-size:65px; animation: float 3s infinite ease-in-out; }
+@keyframes float {
+  50% {transform:translateY(-8px)}
+}
+.badge-available { background:#dff5e9;color:#176c49; }
+.badge-issued { background:#fff0d1;color:#8a5b00; }
+.login-box { max-width:430px; margin:auto; }
+.table td,.table th { padding:12px; vertical-align:middle; }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginPage" class="container-fluid min-vh-100 d-flex align-items-center py-4">
+ <div class="row w-100 align-items-center">
+  <div class="col-lg-6 text-center mb-4">
+   <div class="book-icon">📚</div>
+   <h1 class="fw-bold" style="color:#203653">Smart Library</h1>
+   <p class="text-secondary">Discover knowledge. Manage books smarter.</p>
+  </div>
+  <div class="col-lg-6">
+   <div class="card p-4 login-box">
+    <h3 class="fw-bold mb-1">Welcome back</h3>
+    <p class="text-secondary">Sign in to your library account.</p>
+    <label class="form-label">Login type</label>
+    <select id="role" class="form-select mb-3">
+     <option value="student">Student</option>
+     <option value="admin">Administrator</option>
+    </select>
+    <label class="form-label">ID / Roll Number</label>
+    <input id="loginId" class="form-control mb-3" placeholder="Enter ID">
+    <label class="form-label">Password</label>
+    <input id="loginPassword" type="password" class="form-control mb-3"
+      placeholder="Enter password">
+    <button class="btn btn-primary w-100" onclick="login()">Sign in</button>
+    <div id="loginError" class="text-danger mt-3"></div>
+    <hr>
+    <small>
+     <b>Admin:</b> admin / admin123<br>
+     <b>Student:</b> STU001 / student123
+    </small>
+   </div>
+  </div>
+ </div>
+</div>
+
+<!-- APPLICATION -->
+<div id="app" style="display:none">
+<nav class="navbar navbar-expand-lg shadow-sm">
+ <div class="container-fluid">
+  <a class="navbar-brand brand" href="#" onclick="showPage('home')">📚 Smart Library</a>
+  <button class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#nav">
+   <span class="navbar-toggler-icon"></span>
+  </button>
+  <div class="collapse navbar-collapse" id="nav">
+   <div class="navbar-nav me-auto" id="navigation"></div>
+   <span id="loggedUser" class="me-3 fw-semibold"></span>
+   <button class="btn btn-outline-secondary btn-sm" onclick="logout()">Logout</button>
+  </div>
+ </div>
+</nav>
+
+<main class="container-fluid p-3 p-lg-4">
+
+<!-- HOME -->
+<section id="home" class="view active">
+ <div class="hero mb-4">
+  <div class="row align-items-center">
+   <div class="col-md-8">
+    <h1 class="fw-bold">Your learning space ✨</h1>
+    <p class="mb-0">Manage books, track borrowing, and explore knowledge.</p>
+   </div>
+   <div class="col-md-4 text-center">
+    <div class="book-icon">📖</div>
+   </div>
+  </div>
+ </div>
+ <div class="row g-3 mb-4" id="stats"></div>
+ <div class="card p-4">
+  <h4>Recently added books</h4>
+  <div id="recentBooks" class="mt-3"></div>
+ </div>
+</section>
+
+<!-- BOOKS -->
+<section id="books" class="view">
+ <div class="d-flex justify-content-between align-items-center mb-3">
+  <h2>Book Management</h2>
+  <button id="addBookBtn" class="btn btn-primary" onclick="addBook()">+ Add book</button>
+ </div>
+ <div class="card p-3">
+  <input id="search" class="form-control mb-3"
+    placeholder="Search title, author or book code..." oninput="renderBooks()">
+  <div class="table-responsive">
+   <table class="table">
+    <thead><tr><th>Book</th><th>Code / QR</th><th>Category</th><th>Status</th><th>Action</th></tr></thead>
+    <tbody id="bookRows"></tbody>
+   </table>
+  </div>
+ </div>
+</section>
+
+<!-- ISSUE AND RETURN -->
+<section id="transactions" class="view">
+ <h2 class="mb-3">Issue & Return Desk</h2>
+ <div class="row g-3">
+  <div class="col-lg-5">
+   <div class="card p-3">
+    <h5>Scan book QR code</h5>
+    <div id="reader" class="mb-3"></div>
+    <button class="btn btn-outline-primary mb-3" onclick="startScanner()">Start camera</button>
+    <button class="btn btn-outline-secondary mb-3" onclick="stopScanner()">Stop camera</button>
+    <label class="form-label">Book code / QR value</label>
+    <div class="input-group">
+     <input id="bookCode" class="form-control" placeholder="Example: BK001">
+     <button class="btn btn-primary" onclick="findBook()">Find</button>
+    </div>
+    <div id="bookInfo" class="mt-3"></div>
+    <hr>
+    <h6>Student ID card</h6>
+    <p class="small text-secondary">Enter the QR value printed on the student's ID card. The value should contain the student's roll number.</p>
+    <div class="input-group">
+     <input id="cardId" class="form-control" placeholder="STU001">
+     <button class="btn btn-outline-primary" onclick="useCard()">Find student</button>
+    </div>
+    <div id="studentInfo" class="mt-3"></div>
+   </div>
+  </div>
+  <div class="col-lg-7">
+   <div class="card p-4">
+    <h5>Transaction details</h5>
+    <label class="form-label mt-2">Action</label>
+    <select id="action" class="form-select mb-3">
+     <option value="issue">Issue book</option>
+     <option value="return">Return book</option>
+    </select>
+    <label class="form-label">Student roll number</label>
+    <input id="studentId" class="form-control mb-3" placeholder="STU001">
+    <label class="form-label">Book code</label>
+    <input id="transactionBook" class="form-control mb-3" placeholder="BK001">
+    <button class="btn btn-primary w-100" onclick="transact()">Confirm transaction</button>
+    <div id="transactionMessage" class="mt-3"></div>
+    <hr>
+    <p class="small text-secondary mb-0">
+     Loan period: 15 days. Late return penalty: ₹10 per late book.
+     Dates are recorded automatically.
+    </p>
+   </div>
+  </div>
+ </div>
+</section>
+
+<!-- HISTORY -->
+<section id="history" class="view">
+ <h2 class="mb-3">Borrowing History</h2>
+ <div class="card p-3">
+  <input id="historySearch" class="form-control mb-3"
+    placeholder="Search student or book..." oninput="renderHistory()">
+  <div class="table-responsive">
+   <table class="table">
+    <thead><tr><th>Book / Student</th><th>Issued</th><th>Due</th><th>Returned</th><th>Penalty</th><th>Status</th></tr></thead>
+    <tbody id="historyRows"></tbody>
+   </table>
+  </div>
+ </div>
+</section>
+
+<!-- STUDENTS -->
+<section id="students" class="view">
+ <div class="d-flex justify-content-between align-items-center mb-3">
+  <h2>Student Directory</h2>
+  <button class="btn btn-primary" onclick="createStudent()">+ Add student</button>
+ </div>
+ <div class="card p-3">
+  <div class="table-responsive">
+   <table class="table">
+    <thead><tr><th>Name</th><th>Roll number</th><th>Course</th><th>Email</th></tr></thead>
+    <tbody id="studentRows"></tbody>
+   </table>
+  </div>
+ </div>
+</section>
+
+</main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+"use strict";
+
+/* DEMO DATABASE */
+const DEFAULT_BOOKS = [
+ {code:"BK001",title:"Introduction to Algorithms",author:"Thomas Cormen",category:"Computer Science"},
+ {code:"BK002",title:"Clean Code",author:"Robert Martin",category:"Programming"},
+ {code:"BK003",title:"The Alchemist",author:"Paulo Coelho",category:"Fiction"},
+ {code:"BK004",title:"Database System Concepts",author:"Silberschatz",category:"Database"},
+ {code:"BK005",title:"Computer Networks",author:"Tanenbaum",category:"Networking"}
+];
+
+const DEFAULT_STUDENTS = [
+ {id:"STU001",name:"Aarav Sharma",password:"student123",course:"CSE",email:"aarav@example.com"},
+ {id:"STU002",name:"Diya Patel",password:"student123",course:"ECE",email:"diya@example.com"}
+];
+
+function getData(key, fallback) {
+ try {
+  const v=localStorage.getItem("library_"+key);
+  return v ? JSON.parse(v) : fallback;
+ } catch(e) { return fallback; }
+}
+function putData(key,value) {
+ localStorage.setItem("library_"+key,JSON.stringify(value));
+}
+function init() {
+ if(!localStorage.getItem("library_books")) putData("books",DEFAULT_BOOKS);
+ if(!localStorage.getItem("library_students")) putData("students",DEFAULT_STUDENTS);
+ if(!localStorage.getItem("library_history")) putData("history",[]);
+}
+const getBooks=()=>getData("books",[]);
+const getStudents=()=>getData("students",[]);
+const getHistory=()=>getData("history",[]);
+let user=null,scanner=null;
+
+function login() {
+ const role=document.getElementById("role").value;
+ const id=document.getElementById("loginId").value.trim();
+ const password=document.getElementById("loginPassword").value;
+ let found=null;
+
+ if(role==="admin" && id.toLowerCase()==="admin" && password==="admin123") {
+  found={id:"admin",name:"Library Admin",role:"admin"};
+ } else if(role==="student") {
+  const s=getStudents().find(s=>s.id.toLowerCase()===id.toLowerCase() && s.password===password);
+  if(s) found={...s,role:"student"};
+ }
+
+ if(!found) {
+  document.getElementById("loginError").textContent="Invalid ID or password.";
+  return;
+ }
+ user=found;
+ document.getElementById("loginError").textContent="";
+ document.getElementById("loginPage").style.display="none";
+ document.getElementById("app").style.display="block";
+ document.getElementById("loggedUser").textContent=user.name;
+ buildNavigation();
+ showPage("home");
+}
+function logout() {
+ stopScanner();
+ user=null;
+ document.getElementById("app").style.display="none";
+ document.getElementById("loginPage").style.display="flex";
+ document.getElementById("loginId").value="";
+ document.getElementById("loginPassword").value="";
+}
+function buildNavigation() {
+ const items=[
+  ["home","Home"],["books","Books"],["transactions","Issue / Return"],["history","History"]
+ ];
+ if(user.role==="admin") items.push(["students","Students"]);
+ document.getElementById("navigation").innerHTML=items.map(i=>
+  `<a class="nav-link" href="#" onclick="showPage('${i[0]}');return false">${i[1]}</a>`
+ ).join("");
+ document.getElementById("addBookBtn").style.display=user.role==="admin"?"":"none";
+}
+function showPage(page) {
+ document.querySelectorAll(".view").forEach(v=>v.classList.remove("active"));
+ document.getElementById(page).classList.add("active");
+ if(page==="home") renderHome();
+ if(page==="books") renderBooks();
+ if(page==="history") renderHistory();
+ if(page==="students") renderStudents();
+ window.scrollTo({top:0,behavior:"smooth"});
+}
+function escapeHTML(value) {
+ return String(value??"").replace(/[&<>"']/g,c=>({
+  "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+ }[c]));
+}
+function today() {
+ const d=new Date();
+ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+}
+function dueDate(date,days=15) {
+ const d=new Date(date+"T12:00:00");
+ d.setDate(d.getDate()+days);
+ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+}
+function formatDate(date) {
+ if(!date) return "—";
+ return new Date(date+"T12:00:00").toLocaleDateString();
+}
+function late(record) {
+ return !record.returned && today()>record.due;
+}
+function fine(record) {
+ return (record.returned?record.fine:late(record)?10:0);
+}
+function renderHome() {
+ const b=getBooks(),h=getHistory();
+ const visibleHistory=user.role==="admin"?h:h.filter(r=>r.studentId===user.id);
+ const active=visibleHistory.filter(r=>!r.returned);
+ const overdue=active.filter(late);
+ const values=[
+  ["Total books",b.length,"📚"],
+  ["Available",b.filter(x=>!x.loanId).length,"✓"],
+  ["Active loans",active.length,"↔"],
+  ["Overdue",overdue.length,"⏰"]
+ ];
+ document.getElementById("stats").innerHTML=values.map(v=>
+  `<div class="col-6 col-lg-3"><div class="card p-3 h-100">
+  <div class="text-secondary">${v[0]}</div><div class="fs-2 fw-bold">${v[1]}</div><div>${v[2]}</div></div></div>`
+ ).join("");
+ document.getElementById("recentBooks").innerHTML=b.slice(-4).reverse().map(x=>
+  `<div class="border-bottom py-3"><b>${escapeHTML(x.title)}</b>
+  <span class="text-secondary"> · ${escapeHTML(x.author)}</span>
+  <div class="small text-secondary">${escapeHTML(x.code)} · ${x.loanId?"Issued":"Available"}</div></div>`
+ ).join("")||"No books yet.";
+}
+function renderBooks() {
+ const q=(document.getElementById("search").value||"").toLowerCase();
+ const list=getBooks().filter(b=>
+  [b.title,b.author,b.category,b.code].join(" ").toLowerCase().includes(q)
+ );
+ document.getElementById("bookRows").innerHTML=list.map(b=>
+ `<tr><td><b>${escapeHTML(b.title)}</b><div class="small text-secondary">${escapeHTML(b.author)}</div></td>
+ <td>${escapeHTML(b.code)}</td><td>${escapeHTML(b.category)}</td>
+ <td><span class="badge ${b.loanId?"badge-issued":"badge-available"}">${b.loanId?"Issued":"Available"}</span></td>
+ <td>${user.role==="admin"?
+ `<button class="btn btn-sm btn-outline-primary me-1" onclick="editBook('${escapeHTML(b.code)}')">Edit</button>
+ <button class="btn btn-sm btn-outline-danger" onclick="deleteBook('${escapeHTML(b.code)}')">Delete</button>`:
+ `<button class="btn btn-sm btn-outline-primary" onclick="prepareIssue('${escapeHTML(b.code)}')" ${b.loanId?"disabled":""}>Select</button>`}</td></tr>`
+ ).join("")||'<tr><td colspan="5">No books found.</td></tr>';
+}
+function addBook() {
+ if(user.role!=="admin") return;
+ const code=prompt("Unique book code (example BK006):");
+ if(code===null)return;
+ const title=prompt("Book title:");
+ if(title===null)return;
+ const author=prompt("Author:");
+ if(author===null)return;
+ const category=prompt("Category:");
+ if(category===null)return;
+ if(!code.trim()||!title.trim()||!author.trim()||!category.trim()) {
+  alert("All fields are required.");return;
+ }
+ const list=getBooks(),key=code.trim().toUpperCase();
+ if(list.some(b=>b.code.toLowerCase()===key.toLowerCase())) {
+  alert("That book code already exists.");return;
+ }
+ list.push({code:key,title:title.trim(),author:author.trim(),category:category.trim()});
+ putData("books",list);renderBooks();renderHome();alert("Book added.");
+}
+function editBook(code) {
+ const list=getBooks(),b=list.find(x=>x.code===code);
+ if(!b)return;
+ const title=prompt("Book title:",b.title);
+ if(title===null)return;
+ const author=prompt("Author:",b.author);
+ if(author===null)return;
+ const category=prompt("Category:",b.category);
+ if(category===null)return;
+ b.title=title.trim();b.author=author.trim();b.category=category.trim();
+ putData("books",list);renderBooks();renderHome();
+}
+function deleteBook(code) {
+ const list=getBooks(),b=list.find(x=>x.code===code);
+ if(b.loanId){alert("Return the book before deleting it.");return;}
+ if(!confirm("Delete "+b.title+"?"))return;
+ putData("books",list.filter(x=>x.code!==code));renderBooks();renderHome();
+}
+function prepareIssue(code) {
+ showPage("transactions");
+ document.getElementById("bookCode").value=code;
+ document.getElementById("transactionBook").value=code;
+ findBook();
+ if(user.role==="student")document.getElementById("studentId").value=user.id;
+}
+function findBook() {
+ let raw=document.getElementById("bookCode").value.trim();
+ if(raw.includes("|"))raw=raw.split("|")[0].trim();
+ document.getElementById("bookCode").value=raw;
+ document.getElementById("transactionBook").value=raw;
+ const b=getBooks().find(x=>x.code.toLowerCase()===raw.toLowerCase());
+ document.getElementById("bookInfo").innerHTML=b?
+ `<div class="alert alert-info"><b>${escapeHTML(b.title)}</b><br>${escapeHTML(b.code)} · ${b.loanId?"Currently issued":"Available"}</div>`:
+ '<div class="text-danger">Book not found. Check the QR value or add the book.</div>';
+}
+function useCard() {
+ let id=document.getElementById("cardId").value.trim();
+ if(id.includes("|"))id=id.split("|")[0].trim();
+ document.getElementById("cardId").value=id;
+ document.getElementById("studentId").value=id;
+ const s=getStudents().find(x=>x.id.toLowerCase()===id.toLowerCase());
+ document.getElementById("studentInfo").innerHTML=s?
+ `<div class="alert alert-success"><b>${escapeHTML(s.name)}</b><br>
+ Roll: ${escapeHTML(s.id)}<br>Course: ${escapeHTML(s.course)}<br>Email: ${escapeHTML(s.email)}</div>`:
+ '<div class="text-danger">Student not found.</div>';
+}
+function transact() {
+ const action=document.getElementById("action").value;
+ const studentId=document.getElementById("studentId").value.trim();
+ const code=document.getElementById("transactionBook").value.trim().toUpperCase();
+ const s=getStudents().find(x=>x.id.toLowerCase()===studentId.toLowerCase());
+ const b=getBooks().find(x=>x.code.toLowerCase()===code.toLowerCase());
+ const msg=document.getElementById("transactionMessage");
+ if(!s||!b){msg.innerHTML='<div class="alert alert-danger">Enter a valid student ID and book code.</div>';return;}
+ if(user.role==="student"&&s.id!==user.id){msg.innerHTML='<div class="alert alert-danger">You can only use your own student ID.</div>';return;}
+ const books=getBooks(),records=getHistory();
+ if(action==="issue") {
+  if(b.loanId){msg.innerHTML='<div class="alert alert-danger">This book is already issued.</div>';return;}
+  const active=records.filter(r=>r.studentId===s.id&&!r.returned);
+  if(active.length>=3){msg.innerHTML='<div class="alert alert-danger">Maximum 3 active loans per student.</div>';return;}
+  const record={
+   id:"TX"+Date.now(),bookCode:b.code,bookTitle:b.title,
+   studentId:s.id,studentName:s.name,
+   issue:today(),due:dueDate(today()),returned:false,
+   returnDate:null,fine:0
+  };
+  records.push(record);b.loanId=record.id;
+  putData("history",records);putData("books",books);
+  msg.innerHTML=`<div class="alert alert-success">Issued to <b>${escapeHTML(s.name)}</b>.<br>Issued: ${formatDate(record.issue)}<br>Due: ${formatDate(record.due)}</div>`;
+ } else {
+  if(!b.loanId){msg.innerHTML='<div class="alert alert-warning">This book is not currently issued.</div>';return;}
+  const r=records.find(x=>x.id===b.loanId&&!x.returned);
+  if(!r){msg.innerHTML='<div class="alert alert-danger">Active loan record missing.</div>';return;}
+  if(r.studentId!==s.id){msg.innerHTML=`<div class="alert alert-danger">This book belongs to ${escapeHTML(r.studentName)} (${escapeHTML(r.studentId)}). Enter the correct roll number.</div>`;return;}
+  if(user.role==="student"&&r.studentId!==user.id){msg.innerHTML='<div class="alert alert-danger">You cannot return another student’s book.</div>';return;}
+  r.returned=true;r.returnDate=today();r.fine=today()>r.due?10:0;
+  delete b.loanId;
+  putData("history",records);putData("books",books);
+  msg.innerHTML=`<div class="alert alert-success">Returned by <b>${escapeHTML(s.name)}</b>.<br>Returned: ${formatDate(r.returnDate)}<br>Penalty: ₹${r.fine}</div>`;
+ }
+ renderHome();renderBooks();renderHistory();
+}
+function renderHistory() {
+ const q=(document.getElementById("historySearch").value||"").toLowerCase();
+ let list=getHistory().filter(r=>
+  (user.role==="admin"||r.studentId===user.id)&&
+  [r.bookTitle,r.bookCode,r.studentName,r.studentId].join(" ").toLowerCase().includes(q)
+ ).sort((a,b)=>b.issue.localeCompare(a.issue));
+ document.getElementById("historyRows").innerHTML=list.map(r=>
+ `<tr><td><b>${escapeHTML(r.bookTitle)}</b><div class="small">${escapeHTML(r.studentName)} (${escapeHTML(r.studentId)})</div></td>
+ <td>${formatDate(r.issue)}</td><td>${formatDate(r.due)}</td>
+ <td>${formatDate(r.returnDate)}</td><td>₹${fine(r)}</td>
+ <td>${r.returned?"Returned":late(r)?"Overdue":"On loan"}</td></tr>`
+ ).join("")||'<tr><td colspan="6">No records found.</td></tr>';
+}
+function renderStudents() {
+ if(user.role!=="admin")return;
+ document.getElementById("studentRows").innerHTML=getStudents().map(s=>
+ `<tr><td>${escapeHTML(s.name)}</td><td>${escapeHTML(s.id)}</td>
+ <td>${escapeHTML(s.course)}</td><td>${escapeHTML(s.email)}</td></tr>`
+ ).join("");
+}
+function createStudent() {
+ if(user.role!=="admin")return;
+ const name=prompt("Student full name:");
+ if(name===null)return;
+ const id=prompt("Unique roll number:");
+ if(id===null)return;
+ const password=prompt("Student password:");
+ if(password===null)return;
+ const course=prompt("Course:");
+ if(course===null)return;
+ const email=prompt("Email:");
+ if(email===null)return;
+ const list=getStudents();
+ if(!name.trim()||!id.trim()||!password||!course.trim()||!email.trim()){
+  alert("All fields are required.");return;
+ }
+ if(list.some(s=>s.id.toLowerCase()===id.trim().toLowerCase())){
+  alert("This roll number already exists.");return;
+ }
+ if(list.some(s=>s.email.toLowerCase()===email.trim().toLowerCase())){
+  alert("This email already exists.");return;
+ }
+ list.push({name:name.trim(),id:id.trim(),password,course:course.trim(),email:email.trim()});
+ putData("students",list);renderStudents();alert("Student account created.");
+}
+async function startScanner() {
+ if(!window.Html5Qrcode){alert("QR library unavailable. Enter the code manually.");return;}
+ try{
+  if(!scanner)scanner=new Html5Qrcode("reader");
+  await scanner.start({facingMode:"environment"},
+   {fps:10,qrbox:{width:220,height:220}},
+   decoded=>{
+    document.getElementById("bookCode").value=decoded;
+    findBook();stopScanner();
+   },()=>{});
+ }catch(e){alert("Camera unavailable. Allow camera access or enter the book code manually.");}
+}
+async function stopScanner() {
+ if(scanner){
+  try{if(scanner.isScanning)await scanner.stop();}catch(e){}
+ }
+}
+init();
+</script>
+</body>
+</html>
